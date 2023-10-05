@@ -2,60 +2,147 @@ package internal
 
 import (
 	"bytes"
-	"github.com/sadihakan/dummy-dump/model"
-	"log"
+	"context"
+	"errors"
+	"fmt"
+	"github.com/sadihakan/dummy-dump/config"
 	"os"
 	"os/exec"
 	"strings"
 )
 
 // CheckBinary ...
-func CheckBinary(binaryPath string, sourceType model.SOURCE_TYPE, importArg bool, exportArg bool) string {
+func CheckBinary(ctx context.Context, binaryPath string, sourceType config.SourceType, importArg bool, exportArg bool) (string, error) {
+	var err error
 	if binaryPath == "" {
-
 		if importArg {
-			binaryPath = checkImport(sourceType)
+			binaryPath, err = checkImport(ctx, sourceType)
+			if err != nil {
+				return "", err
+			}
 		}
 
 		if exportArg {
-			binaryPath = checkExport(sourceType)
+			binaryPath, err = checkExport(ctx, sourceType)
+			if err != nil {
+				return "", err
+			}
+		}
+
+	}
+	return binaryPath, nil
+}
+
+// CheckVersion ...
+func CheckVersion(ctx context.Context, binaryPath string, sourceType config.SourceType) (string, error) {
+	version, err := checkVersion(ctx, binaryPath, sourceType)
+
+	if err != nil {
+		return "", err
+	}
+
+	return version, nil
+}
+
+func checkVersion(ctx context.Context, binaryPath string, sourceType config.SourceType) (string, error) {
+	var out bytes.Buffer
+	var cmd *exec.Cmd
+
+	cmd = CheckVersionCommand(ctx, binaryPath, sourceType)
+
+	cmd.Stderr = os.Stderr
+	cmd.Stdin = os.Stdin
+	cmd.Stdout = &out
+	err := cmd.Run()
+
+	if err != nil {
+		return "", err
+	}
+	lines := strings.Split(out.String(), "\n")
+	return strings.TrimSpace(lines[0]), nil
+}
+
+func checkImport(_ context.Context, sourceType config.SourceType) (string, error) {
+	var path string
+
+	switch sourceType {
+	case config.PostgreSQL:
+		path, _ = exec.LookPath("pg_restore")
+	case config.MySQL:
+		path, _ = exec.LookPath("mysql")
+	case config.Oracle:
+		path, _ = exec.LookPath("impdp")
+	}
+
+	return path, nil
+}
+
+func checkExport(ctx context.Context, sourceType config.SourceType) (string, error) {
+	var err error
+	var path string
+
+	switch sourceType {
+	case config.PostgreSQL:
+		path, _ = exec.LookPath("pg_dump")
+	case config.MySQL:
+		path, _ = exec.LookPath("mysqldump")
+	case config.Oracle:
+		path, _ = exec.LookPath("expdp")
+	}
+
+	if path != "" {
+		path, err = findAndValidateExport(ctx, config.Config{
+			BinaryPath: path,
+			Source:     sourceType,
+		})
+		if err == nil {
+			return path, nil
+		}
+	} else {
+		switch sourceType {
+		case config.PostgreSQL:
+			for i := 0; i < len(predefinedPostgresPaths); i++ {
+				path, err = findAndValidateExport(ctx, config.Config{
+					BinaryPath: predefinedPostgresPaths[i],
+					Source:     config.PostgreSQL,
+				})
+				if err == nil {
+					break
+				}
+			}
+			return path, nil
+		case config.MySQL:
+			for i := 0; i < len(predefinedMySQLPaths); i++ {
+				path, err = findAndValidateExport(ctx, config.Config{
+					BinaryPath: predefinedMySQLPaths[i],
+					Source:     config.MySQL,
+				})
+				if err == nil {
+					break
+				}
+			}
+			return path, nil
 		}
 	}
-	return binaryPath
-}
-
-func checkImport(sourceType model.SOURCE_TYPE) string {
-	var out bytes.Buffer
-	var cmd *exec.Cmd
-
-	cmd = CreateImportBinaryCommand(sourceType)
-
-	cmd.Stderr = os.Stderr
-	cmd.Stdin = os.Stdin
-	cmd.Stdout = &out
-	err := cmd.Run()
 
 	if err != nil {
-		log.Fatal(err)
+		return "", err
 	}
 
-	return strings.TrimSuffix(out.String(), "\n")
+	return path, nil
 }
 
-func checkExport(sourceType model.SOURCE_TYPE) string {
+func findAndValidateExport(ctx context.Context, config config.Config) (string, error) {
+	cmd := CheckBinaryPathCommand(ctx, config)
+
 	var out bytes.Buffer
-	var cmd *exec.Cmd
+	var stderr bytes.Buffer
 
-	cmd = CreateExportBinaryCommand(sourceType)
-
-	cmd.Stderr = os.Stderr
-	cmd.Stdin = os.Stdin
 	cmd.Stdout = &out
-	err := cmd.Run()
-
-	if err != nil {
-		log.Fatal(err)
+	cmd.Stderr = &stderr
+	if err := cmd.Run(); err != nil {
+		return "", errors.New(fmt.Sprint(err) + ": " + stderr.String())
 	}
 
-	return strings.TrimSuffix(out.String(), "\n")
+	return config.BinaryPath, nil
 }

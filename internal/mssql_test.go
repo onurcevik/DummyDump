@@ -5,25 +5,25 @@ import (
 	"testing"
 )
 
-func TestMySQL_Check(t *testing.T) {
+func TestMSSQL_Check(t *testing.T) {
 	var d Dump
-	d = MySQL{}
+	d = MSSQL{}
 	d.Check(nil)
 }
 
-func TestMySQL_CheckWithError(t *testing.T) {
+func TestMSSQL_CheckWithError(t *testing.T) {
 	var d Dump
-	d = MySQL{}
+	d = MSSQL{}
 	err := d.Check(nil)
 	if err != nil {
-		t.Errorf("MySQL Check() Error: %s", err.Error())
+		t.Errorf("MSSQL Check() Error: %s", err.Error())
 	}
+
 }
 
-func TestMySQL_Import(t *testing.T) {
+func TestMSSQL_Import(t *testing.T) {
 	var d Dump
-	d = MySQL{}
-
+	d = MSSQL{}
 	config := config.Config{
 		Source:         "",
 		Import:         false,
@@ -33,14 +33,14 @@ func TestMySQL_Import(t *testing.T) {
 		BackupFilePath: "",
 		DB:             "",
 		BinaryPath:     "",
+		BackupName:     "",
 	}
 	d.Import(nil, config)
-
 }
 
-func TestMySQL_ImportWithError(t *testing.T) {
+func TestMSSQL_ImportWithError(t *testing.T) {
 	var d Dump
-	d = MySQL{}
+	d = MSSQL{}
 
 	config := config.Config{
 		Source:         "",
@@ -51,17 +51,18 @@ func TestMySQL_ImportWithError(t *testing.T) {
 		BackupFilePath: "",
 		DB:             "",
 		BinaryPath:     "",
+		BackupName:     "",
 	}
 	err := d.Import(nil, config)
-
 	if err != nil {
-		t.Errorf("MySQL Import() Error: %s", err.Error())
+		t.Errorf("MSSQL Import() Error: %s", err.Error())
 	}
 }
 
-func TestMySQL_Export(t *testing.T) {
+func TestMSSQL_Export(t *testing.T) {
 	var d Dump
-	d = MySQL{}
+	d = MSSQL{}
+
 	config := config.Config{
 		Source:         "",
 		Import:         false,
@@ -71,14 +72,15 @@ func TestMySQL_Export(t *testing.T) {
 		BackupFilePath: "",
 		DB:             "",
 		BinaryPath:     "",
+		BackupName:     "",
 	}
 	d.Export(nil, config)
-
 }
 
-func TestMySQL_ExportWithError(t *testing.T) {
+func TestMSSQL_ExportWithError(t *testing.T) {
 	var d Dump
-	d = MySQL{}
+	d = MSSQL{}
+
 	config := config.Config{
 		Source:         "",
 		Import:         false,
@@ -88,9 +90,10 @@ func TestMySQL_ExportWithError(t *testing.T) {
 		BackupFilePath: "",
 		DB:             "",
 		BinaryPath:     "",
+		BackupName:     "",
 	}
 	err := d.Export(nil, config)
 	if err != nil {
-		t.Errorf("MySQL Export() Error: %s", err.Error())
+		t.Errorf("MSSQL Import() Error: %s", err.Error())
 	}
 }

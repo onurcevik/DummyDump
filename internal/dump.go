@@ -1,8 +1,13 @@
 package internal
 
+import (
+	"context"
+	"github.com/sadihakan/dummy-dump/config"
+)
+
 // Dump ...
 type Dump interface {
-	Check() error
-	Export(binaryPath string, user string, database string) error
-	Import(binaryPath string, user string, database string, path string) error
+	CheckPath(ctx context.Context, dump config.Config) error
+	Export(ctx context.Context, dump config.Config) error
+	Import(ctx context.Context, dump config.Config) error
 }

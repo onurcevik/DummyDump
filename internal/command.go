@@ -1,162 +1,141 @@
 package internal
 
 import (
+	"context"
 	"fmt"
-	"github.com/sadihakan/dummy-dump/model"
+	"github.com/sadihakan/dummy-dump/config"
 	"github.com/sadihakan/dummy-dump/util"
 	"os/exec"
+	"path/filepath"
 	"runtime"
-	"time"
+	"strconv"
+	"strings"
 )
 
 const (
-	//pgDatabase     = "--dbname=postgres"
-	pgFlagDatabase = "-d"
-	pgFlagFileName = "-f"
-	pgFlagCreate   = "--create"
-	pgFlatFormat   = "--format=c"
+	pgDatabase           = "--dbname=postgres"
+	pgFlagDatabase       = "-d"
+	pgFlagFileName       = "-f"
+	pgFlagCreateDatabase = "-C"
+	pgFlagCreate         = "--create"
+	pgFlagFormat         = "--format=c"
+	pgVersion            = "--version"
+	pgFlagPassword       = "-W"
+	mysqlVersion         = "--version"
+	oracleVersion        = "-V"
 
-	//pgRestore="pg_restore"
-	//pgDump="pg_dump"
-	mysqlDatabase     = "deneme"
-	mysqlFlagUser     = "-u"
-	mysqlFlagPassword = "-p"
-	mysqlFlagExecute  = "-e"
-	//mysqlImport="mysql"
-	//mysqlDump="mysqldump"
-	mssqlFlagUser  = "-U"
-	mssqlFlagQuery = "-Q"
+	mysqlFlagUser       = "--user"
+	mysqlFlagPassword   = "--password"
+	mysqlFlagExecute    = "-e"
+	mysqlFlagResultFile = "--result-file"
+
+	host    = "--host="
+	port    = "--port="
+	noOwner = "-x"
 )
 
-// CreateImportBinaryCommand ...
-func CreateImportBinaryCommand(sourceType model.SOURCE_TYPE) *exec.Cmd {
-	return exec.Command(util.Which(), getImportCommand(sourceType)...)
+// CheckBinaryPathCommand ...
+func CheckBinaryPathCommand(ctx context.Context, cfg config.Config) *exec.Cmd {
+	return homeDirCommand(ctx, cfg.BinaryPath, getVersionCommandArg(cfg.Source))
 }
 
-// CreateExportBinaryCommand ...
-func CreateExportBinaryCommand(sourceType model.SOURCE_TYPE) *exec.Cmd {
-	return exec.Command(util.Which(), getExportCommand(sourceType)...)
+// CheckVersionCommand ...
+func CheckVersionCommand(ctx context.Context, binaryPath string, sourceType config.SourceType) *exec.Cmd {
+	return homeDirCommand(ctx, binaryPath, getVersionCommandArg(sourceType))
 }
 
 // CreateExportCommand ...
-func CreateExportCommand(name string, sourceType model.SOURCE_TYPE, user string, database string) *exec.Cmd {
-	return exec.Command(util.Name(name), getExportCommandArg(name, sourceType, user, database)...)
-
+func CreateExportCommand(ctx context.Context, cfg config.Config) *exec.Cmd {
+	return homeDirCommand(ctx, cfg.BinaryPath, getExportCommandArg(cfg))
 }
 
 // CreateImportCommand ...
-func CreateImportCommand(name string, sourceType model.SOURCE_TYPE, user string, database string, path string) *exec.Cmd {
-	return exec.Command(util.Name(name), getImportCommandArg(name, sourceType, user, database, path)...)
+func CreateImportCommand(ctx context.Context, cfg config.Config) *exec.Cmd {
+	return homeDirCommand(ctx, cfg.BinaryPath, getImportCommandArg(cfg))
 }
 
-func getImportCommandArg(binaryName string, sourceType model.SOURCE_TYPE, user string, database, path string) (arg []string) {
-	switch sourceType {
-	case model.PostgreSQL:
-		switch runtime.GOOS {
-		case "darwin":
-			arg = []string{user, pgFlagDatabase, database, path, pgFlagCreate}
-		case "linux":
-			arg = []string{user, pgFlagDatabase, database, pgFlagCreate}
-		case "windows":
-			arg = []string{"/C", binaryName, user, pgFlagDatabase, database, path, pgFlagCreate}
+func homeDirCommand(ctx context.Context, command string, arg []string) *exec.Cmd {
+	params := make([]string, 0)
+	cmd := new(exec.Cmd)
+	switch runtime.GOOS {
+	case "darwin":
+		if command != "" {
+			params = append(params, command)
 		}
-	case model.MySQL:
-		switch runtime.GOOS {
-		case "darwin":
-			arg = []string{mysqlFlagUser, user, mysqlFlagPassword, database, mysqlFlagExecute, "source " + path}
-		case "linux":
-			arg = []string{mysqlFlagUser, user, mysqlFlagPassword, database, mysqlFlagExecute, "source " + path}
-		case "windows":
-			arg = []string{"/C", binaryName, mysqlFlagUser, user, mysqlFlagPassword, database, mysqlFlagExecute, "source " + path}
+		params = append(params, arg...)
+		cmd = exec.CommandContext(ctx, "sh", "-c", strings.Join(params, " "))
+	case "linux":
+		cmd = exec.CommandContext(ctx, command, arg...)
+	case "windows":
+		if command != "" {
+			params = append(params, strconv.Quote(command))
 		}
-	case model.MSSQL:
-		importQuery := fmt.Sprintf(`RESTORE DATABASE [%s] FROM DISK = '%s'`,
-			database,
-			path)
-		arg = []string{"/C", binaryName, mssqlFlagUser, user, mssqlFlagQuery, importQuery}
+		params = append(params, arg...)
+		cmd = exec.CommandContext(ctx, "powershell.exe", "&", strings.TrimSpace(strings.Join(params, " ")))
 	}
 
-	return arg
+	cmd.Dir = util.HomeDir()
+
+	return cmd
 }
 
-func getExportCommandArg(binaryName string, sourceType model.SOURCE_TYPE, user string, database string) (arg []string) {
-	today := time.Now().UTC().UnixNano()
-	filename := fmt.Sprintf("%d.backup", today)
+// getVersionCommandArg ...
+func getVersionCommandArg(sourceType config.SourceType) (arg []string) {
 	switch sourceType {
-	case model.PostgreSQL:
-
-		switch runtime.GOOS {
-		case "darwin":
-			arg = []string{user, database, pgFlagFileName, filename, pgFlagCreate, pgFlatFormat}
-		case "linux":
-			arg = []string{user, database, pgFlagFileName, filename, pgFlagCreate, pgFlatFormat}
-		case "windows":
-			arg = []string{"/C", binaryName, user, database, pgFlagFileName, filename, pgFlagCreate, pgFlatFormat}
-		}
-	case model.MySQL:
-		switch runtime.GOOS {
-		case "darwin":
-			arg = []string{mysqlFlagUser, user, mysqlFlagPassword, database}
-		case "linux":
-			arg = []string{mysqlFlagUser, user, mysqlFlagPassword, database}
-		case "windows":
-			arg = []string{"/C", binaryName, mysqlFlagUser, user, mysqlFlagPassword, database, pgFlagCreate, pgFlatFormat}
-		}
-	case model.MSSQL:
-		exportQuery := fmt.Sprintf(`BACKUP DATABASE [%s] TO DISK = '%s'`,
-			database,
-			util.GetMSSQLBackupDirectory()+`\`+fmt.Sprintf("%d.bak", today))
-		arg = []string{"/C", binaryName, mssqlFlagUser, user, mssqlFlagQuery, exportQuery}
+	case config.PostgreSQL:
+		arg = []string{pgVersion}
+	case config.MySQL:
+		arg = []string{mysqlVersion}
+	case config.Oracle:
+		arg = []string{oracleVersion}
 	}
 	return arg
 }
 
-func getImportCommand(sourceType model.SOURCE_TYPE) (command []string) {
-	switch sourceType {
-	case model.PostgreSQL:
-		switch runtime.GOOS {
-		case "darwin":
-			command = []string{"pg_restore"}
-		case "linux":
-			command = []string{"pg_restore"}
-		case "windows":
-			command = []string{"/r", "C:\\Program Files\\Postgresql", "pg_restore"}
-		}
-	case model.MySQL:
-		switch runtime.GOOS {
-		case "darwin":
-			command = []string{"mysql"}
-		case "linux":
-			command = []string{"mysql"}
-		case "windows":
-			command = []string{"/r", "C:\\Program Files\\MySQL", "mysql"}
-		}
+// getImportCommandArg ...
+func getImportCommandArg(cfg config.Config) (arg []string) {
+	host := fmt.Sprintf("%s%s", host, cfg.Host)
+	port := fmt.Sprintf("%s%d", port, cfg.Port)
+	switch cfg.Source {
+	case config.PostgreSQL:
+		arg = []string{"-d", fmt.Sprintf("postgresql://%s:%s@%s:%d/%s", cfg.User, cfg.Password, cfg.Host, cfg.Port, cfg.DB), filepath.Join(cfg.BackupFilePath, cfg.BackupName)}
+	case config.MySQL:
+		user := fmt.Sprintf("%s=%s", mysqlFlagUser, cfg.User)
+		password := fmt.Sprintf("%s=%s", mysqlFlagPassword, cfg.Password)
+		arg = []string{user, password, host, port, cfg.DB, mysqlFlagExecute, "source " + filepath.Join(cfg.BackupFilePath, cfg.BackupName)}
+	case config.Oracle:
+		//impdp user/password@service schemas=db1,db2.. directory=directory dumpfile=filename
+		connStr := fmt.Sprintf("%s/%s@%s", cfg.User, cfg.Password, cfg.Service)
+		directory := fmt.Sprintf("directory=%s", cfg.BackupFilePath)
+		filename := fmt.Sprintf("dumpfile=%s", cfg.BackupName)
+		schemas := fmt.Sprintf("schemas=%s", cfg.DB)
+		arg = []string{connStr, schemas, directory, filename}
 	}
-
-	return command
+	return arg
 }
 
-func getExportCommand(sourceType model.SOURCE_TYPE) (command []string) {
-	switch sourceType {
-	case model.PostgreSQL:
-		switch runtime.GOOS {
-		case "darwin":
-			command = []string{"pg_dump"}
-		case "linux":
-			command = []string{"pg_dump"}
-		case "windows":
-			command = []string{"/r", "C:\\Program Files\\Postgresql", "pg_dump"}
-		}
-	case model.MySQL:
-		switch runtime.GOOS {
-		case "darwin":
-			command = []string{"mysqldump"}
-		case "linux":
-			command = []string{"mysqldump"}
-		case "windows":
-			command = []string{"/r", "C:\\Program Files\\MySQL", "mysqldump"}
-		}
+// getExportCommandArg ...
+func getExportCommandArg(cfg config.Config) (arg []string) {
+	host := fmt.Sprintf("%s%s", host, cfg.Host)
+	port := fmt.Sprintf("%s%d", port, cfg.Port)
+	switch cfg.Source {
+	case config.PostgreSQL:
+		filename := filepath.Join(cfg.BackupFilePath, cfg.BackupName)
+		dns := fmt.Sprintf(`--dbname=postgresql://%s:%s@%s:%d/%s`, cfg.User, cfg.Password, cfg.Host, cfg.Port, cfg.DB)
+		arg = []string{dns, pgFlagFormat, noOwner, pgFlagFileName, filename}
+	case config.MySQL:
+		filename := filepath.Join(cfg.BackupFilePath, cfg.BackupName)
+		user := fmt.Sprintf(`%s=%s`, mysqlFlagUser, cfg.User)
+		password := fmt.Sprintf(`%s=%s`, mysqlFlagPassword, cfg.Password)
+		resultFile := fmt.Sprintf(`%s=%s`, mysqlFlagResultFile, filename)
+		arg = []string{user, password, host, port, cfg.DB, resultFile}
+	case config.Oracle:
+		//expdp user/password@db schemas=DB1,DB2... directory=directory dumpfile=filename
+		connStr := fmt.Sprintf("%s/%s@%s", cfg.User, cfg.Password, cfg.Service)
+		directory := fmt.Sprintf("directory=%s", cfg.BackupFilePath)
+		filename := fmt.Sprintf("dumpfile=%s", cfg.BackupName)
+		schemas := fmt.Sprintf("schemas=%s", cfg.DB)
+		arg = []string{connStr, schemas, directory, filename}
 	}
-
-	return command
+	return arg
 }

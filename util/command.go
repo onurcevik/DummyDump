@@ -1,52 +1,14 @@
 package util
 
-import (
-	"bytes"
-	"io/ioutil"
-	"log"
-	"os"
-	"os/exec"
-	"runtime"
-	"strings"
-)
+import "os"
 
-// Which ...
-func Which() (which string) {
-	switch runtime.GOOS {
-	case "darwin":
-		which = "which"
-	case "linux":
-		which = "which"
-	case "windows":
-		which = "where"
+func checkCommands(commands []string) (command string) {
+	for _, c := range commands {
+		if _, err := os.Stat(c); err == nil {
+			command = c
+			break
+		}
 	}
 
-	return which
-}
-
-func Name(name string) string {
-	if runtime.GOOS == "windows" {
-		return "cmd"
-	}
-	return name
-}
-
-//The function below is for Windows systems only
-//GetMSSQLBackupDirectory ...
-func GetMSSQLBackupDirectory() string{
-	cmd := exec.Command("reg", "query", "HKEY_LOCAL_MACHINE\\SOFTWARE\\Microsoft\\MICROSOFT SQL SERVER", "/s", "/v", "/f", "BackupDirectory", "/k")
-	var outb bytes.Buffer
-	cmd.Stderr = os.Stderr
-	cmd.Stdin = os.Stdin
-	cmd.Stdout = &outb
-	err := cmd.Run()
-	if err != nil {
-		log.Fatalln(err)
-	}
-	b, err := ioutil.ReadAll(&outb)
-	if err != nil {
-		log.Fatalln(err)
-	}
-	l := strings.Split(strings.Split(string(b), "\n")[2], "    ")
-	return strings.TrimSpace(l[3])
+	return command
 }

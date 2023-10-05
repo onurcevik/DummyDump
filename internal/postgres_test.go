@@ -1,23 +1,22 @@
 package internal
 
 import (
+	"context"
+	"github.com/sadihakan/dummy-dump/config"
 	"github.com/sadihakan/dummy-dump/util"
 	"path/filepath"
 	"testing"
 )
 
-func TestCheck(t *testing.T) {
-	var dump Dump
-	dump = Postgres{}
-
-	dump.Check()
-}
-
 func TestCheckWithError(t *testing.T) {
 	var dump Dump
 	dump = Postgres{}
 
-	err := dump.Check()
+	cnf := config.Config{
+		BinaryPath: "randomstring",
+	}
+
+	err := dump.CheckPath(context.Background(), cnf)
 
 	if err != nil {
 		t.Fatal(err)
@@ -29,12 +28,18 @@ func TestExport(t *testing.T) {
 	var dump Dump
 	dump = Postgres{}
 
-	user := "hakankosanoglu"
-	db := "test"
+	config := config.Config{
+		Source:         "",
+		Import:         false,
+		Export:         true,
+		User:           "hakankosanoglu",
+		Password:       "",
+		BackupFilePath: "",
+		DB:             "test",
+		BinaryPath:     "pg_dump",
+	}
 
-	binaryPath := "pg_restore"
-
-	dump.Export(binaryPath, user, db)
+	dump.Export(nil, config)
 }
 
 func TestExportWithError(t *testing.T) {
@@ -42,12 +47,18 @@ func TestExportWithError(t *testing.T) {
 	var dump Dump
 	dump = Postgres{}
 
-	user := "none"
-	db := "test"
+	config := config.Config{
+		Source:         "",
+		Import:         false,
+		Export:         true,
+		User:           "none",
+		Password:       "",
+		BackupFilePath: "",
+		DB:             "test",
+		BinaryPath:     "pg_dump",
+	}
 
-	binaryPath := "pg_restore"
-
-	dump.Export(binaryPath, user, db)
+	dump.Export(nil, config)
 }
 
 func TestImport(t *testing.T) {
@@ -55,23 +66,38 @@ func TestImport(t *testing.T) {
 	var dump Dump
 	dump = Postgres{}
 
-	user := "hakankosanoglu"
 	file := filepath.Join(util.GetDirectory(), "test.backup")
 
-	binaryPath := "pg_dump"
+	config := config.Config{
+		Source:         "",
+		Import:         true,
+		Export:         false,
+		User:           "hakankosanoglu",
+		Password:       "",
+		BackupFilePath: file,
+		DB:             "",
+		BinaryPath:     "pg_restore",
+	}
 
-	dump.Import(binaryPath, user, file)
+	dump.Import(nil, config)
 }
 
 func TestImportWithError(t *testing.T) {
 
 	var dump Dump
 	dump = Postgres{}
-
-	user := "hakankosanoglu"
 	file := "test"
 
-	binaryPath := "pg_dump"
+	config := config.Config{
+		Source:         "",
+		Import:         true,
+		Export:         false,
+		User:           "hakankosanoglu",
+		Password:       "",
+		BackupFilePath: file,
+		DB:             "",
+		BinaryPath:     "pg_restore",
+	}
 
-	dump.Import(binaryPath, user, file)
+	dump.Import(nil, config)
 }

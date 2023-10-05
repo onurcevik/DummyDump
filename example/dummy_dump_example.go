@@ -1,26 +1,25 @@
 package main
 
 import (
+	"context"
+	"fmt"
 	dummydump "github.com/sadihakan/dummy-dump"
-	"github.com/sadihakan/dummy-dump/model"
+	"github.com/sadihakan/dummy-dump/config"
 )
 
 func main() {
-	dd, err := dummydump.New(&model.Config{
-		Source:     model.PostgreSQL,
-		Import:     true,
-		Export:     false,
-		User:       "sadihakan",
-		Path:       "/path",
-		DB:         "db",
-		BinaryPath: "/binaryPath",
-	})
+	dd, err := dummydump.New()
 
 	if err != nil {
-		panic(err)
+		fmt.Println("DummyDump new error: ", err)
 	}
 
-	dd.Check().Import().Run()
+	dd.SetBinaryConfig(config.MySQL, false, true)
+
+	ctx := context.Background()
+
+	binary, version := dd.GetBinary(ctx)
+	fmt.Println("Bin: ", binary)
+	fmt.Println("Version: ", version)
+
 }
-
-
